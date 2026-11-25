@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Poker Shot Clock - 撲克行動計時器</title>
+  <style>
+    :root {
+      --bg-dark: #0f172a;
+      --card-bg: #1e293b;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --green: #10b981;
+      --amber: #f59e0b;
+      --red: #ef4444;
+      --blue: #3b82f6;
+      --border: #334155;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg-dark);
+      color: var(--text-main);
+      min-height: 100vh;
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px;
+      transition: background-color 0.3s ease;
+      overflow-x: hidden;
+    }
+
+    body.urgent-flash {
+      animation: bgPulse 0.8s infinite;
+    }
+
+    @keyframes bgPulse {
+      0%, 100% { background-color: var(--bg-dark); }
+      50% { background-color: #350a0a; }
+    }
+
+    /* Header & Top Bar */
+    .header {
+      width: 100%;
+      max-width: 460px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .title {
+      font-size: 1.15rem;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .badge {
+      font-size: 0.7rem;
+      background: var(--blue);
+      color: white;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-weight: 700;
+    }
+
+    .icon-btn {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      padding: 8px 12px;
+      border-radius: 10px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s;
+    }
+
+    .icon-btn:active {
+      transform: scale(0.95);
+    }
+
+    /* Preset Duration Selector (30s / 45s / 60s) */
+    .presets {
+      width: 100%;
+      max-width: 460px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      background: var(--card-bg);
+      padding: 6px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      margin-bottom: 12px;
+    }
+
+    .preset-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      padding: 12px 0;
+      font-size: 1.05rem;
+      font-weight: 700;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .preset-btn.active {
+      background: var(--blue);
+      color: white;
+      box-shadow: 0 4px 12px rgba(59, 130, 246, 0.35);
+    }
+
+    /* Main Circular Shot Clock */
+    .clock-wrapper {
+      position: relative;
+      width: 280px;
+      height: 280px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      margin: 6px 0;
+      border-radius: 50%;
+      transition: transform 0.1s ease;
+    }
+
+    .clock-wrapper:active {
+      transform: scale(0.96);
+    }
+
+    .progress-ring {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      transform: rotate(-90deg);
+    }
+
+    .progress-ring__bg {
+      fill: var(--card-bg);
+      stroke: var(--border);
+      stroke-width: 12;
+    }
+
+    .progress-ring__circle {
+      fill: transparent;
+      stroke: var(--green);
+      stroke-width: 12;
+      stroke-linecap: round;
+      stroke-dasharray: 848.23; /* 2 * PI * 135 */
+      stroke-dashoffset: 0;
+      transition: stroke 0.25s ease;
+    }
+
+    .clock-content {
+      position: relative;
+      z-index: 2;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 0 16px;
+    }
+
+    .status-label {
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+      min-height: 1.2em;
+    }
+
+    .time-display {
+      font-size: 4.8rem;
+      font-weight: 900;
+      font-variant-numeric: tabular-nums;
+      line-height: 1;
+      letter-spacing: -2px;
+      color: var(--text-main);
+      transition: color 0.2s ease;
+    }
+
+    .tap-hint {
+      margin-top: 10px;
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      background: rgba(15, 23, 42, 0.7);
+      padding: 4px 12px;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+    }
+
+    /* Action Controls */
+    .main-controls {
+      width: 100%;
+      max-width: 460px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 10px 0;
+    }
+
+    .ctrl-btn {
+      padding: 15px;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      font-size: 1.05rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.15s;
+    }
+
+    .ctrl-btn:active {
+      transform: scale(0.97);
+    }
+
+    .btn-play-pause {
+      background: var(--card-bg);
+      color: var(--text-main);
+    }
+
+    .btn-next {
+      background: var(--green);
+      color: #052e16;
+      border-color: var(--green);
+    }
+
+    /* Time Bank Section */
+    .timebank-card {
+      width: 100%;
+      max-width: 460px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .tb-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .tb-title-group {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .tb-title {
+      font-size: 1rem;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .tb-subtitle {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .tb-chips-display {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      min-height: 30px;
+      align-items: center;
+    }
+
+    .tb-chip {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      border: 2px dashed #fef3c7;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.65rem;
+      font-weight: 900;
+      color: #fff;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+
+    .tb-empty {
+      font-size: 0.85rem;
+      color: var(--red);
+      font-weight: 600;
+    }
+
+    .tb-actions {
+      display: grid;
+      grid-template-columns: 1.5fr 1fr;
+      gap: 10px;
+    }
+
+    .btn-use-tb {
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      color: white;
+      border: none;
+      padding: 14px 10px;
+      border-radius: 12px;
+      font-size: 0.95rem;
+      font-weight: 800;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      box-shadow: 0 4px 12px rgba(245, 158, 11, 0.25);
+      transition: all 0.15s;
+    }
+
+    .btn-use-tb:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
+
+    .btn-use-tb:not(:disabled):active {
+      transform: scale(0.97);
+    }
+
+    .tb-counter-ctrl {
+      display: flex;
+      background: var(--bg-dark);
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+    }
+
+    .tb-step-btn {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: var(--text-main);
+      font-size: 1.25rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .tb-step-btn:active {
+      background: var(--border);
+    }
+
+    .tb-count-num {
+      flex: 1.2;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 0.95rem;
+      border-left: 1px solid var(--border);
+      border-right: 1px solid var(--border);
+    }
+
+    /* Settings Footer inside Time Bank Card */
+    .tb-settings {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .toggle-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .toggle-input {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--blue);
+      cursor: pointer;
+    }
+
+    .tb-value-select {
+      background: var(--bg-dark);
+      color: var(--text-main);
+      border: 1px solid var(--border);
+      padding: 6px 10px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 頂部標題與音效開關 -->
+  <header class="header">
+    <div class="title">
+      <span>⏱️ POKER SHOT CLOCK</span>
+      <span class="badge" id="wakeLockBadge" title="螢幕防鎖機狀態">PRO</span>
+    </div>
+    <button class="icon-btn" id="soundToggleBtn" onclick="toggleSound()">
+      🔊 音效: 開
+    </button>
+  </header>
+
+  <!-- 30秒 / 45秒 / 60秒 預設秒數選擇 -->
+  <div class="presets">
+    <button class="preset-btn active" onclick="setPreset(30)" id="preset-30">30 秒</button>
+    <button class="preset-btn" onclick="setPreset(45)" id="preset-45">45 秒</button>
+    <button class="preset-btn" onclick="setPreset(60)" id="preset-60">60 秒</button>
+  </div>
+
+  <!-- 中央主計時圓環（點擊即重置並開始下一位） -->
+  <div class="clock-wrapper" onclick="handleMainClockTap()">
+    <svg class="progress-ring" viewBox="0 0 290 290">
+      <circle class="progress-ring__bg" cx="145" cy="145" r="135"></circle>
+      <circle class="progress-ring__circle" id="progressCircle" cx="145" cy="145" r="135"></circle>
+    </svg>
+    <div class="clock-content">
+      <div class="status-label" id="statusLabel">準備開始</div>
+      <div class="time-display" id="timeDisplay">30.0</div>
+      <div class="tap-hint" id="tapHint">點擊圓圈：開始 / 下一位</div>
+    </div>
+  </div>
+
+  <!-- 暫停與重置下一位按鈕 -->
+  <div class="main-controls">
+    <button class="ctrl-btn btn-play-pause" id="playPauseBtn" onclick="togglePlayPause()">
+      ▶️ 開始
+    </button>
+    <button class="ctrl-btn btn-next" onclick="resetAndStart()">
+      🔄 下一位 (重置)
+    </button>
+  </div>
+
+  <!-- Time Bank 時間銀行控制面板 -->
+  <section class="timebank-card">
+    <div class="tb-header">
+      <div class="tb-title-group">
+        <div class="tb-title">
+          <span>🏦 TIME BANK 時間銀行</span>
+        </div>
+        <div class="tb-subtitle">唔夠時間諗嗰陣，用加時卡頂住先</div>
+      </div>
+      <div>
+        <select class="tb-value-select" id="tbSecondsSelect" onchange="updateTbIncrement()">
+          <option value="30">每張 +30 秒</option>
+          <option value="45">每張 +45 秒</option>
+          <option value="60">每張 +60 秒</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- 顯示目前剩餘的 Time Bank 卡圖示 -->
+    <div class="tb-chips-display" id="tbChipsContainer"></div>
+
+    <!-- 使用 Time Bank 與加減卡數按鈕 -->
+    <div class="tb-actions">
+      <button class="btn-use-tb" id="useTbBtn" onclick="useTimeBank(false)">
+        ⚡ 使用 Time Bank (+30s)
+      </button>
+      <div class="tb-counter-ctrl">
+        <button class="tb-step-btn" onclick="adjustTbCount(-1)">−</button>
+        <div class="tb-count-num" id="tbCountText">3 張</div>
+        <button class="tb-step-btn" onclick="adjustTbCount(1)">+</button>
+      </div>
+    </div>
+
+    <!-- 自動扣卡開關 -->
+    <div class="tb-settings">
+      <label class="toggle-label">
+        <input type="checkbox" class="toggle-input" id="autoTbCheckbox" checked>
+        歸零時自動扣除 Time Bank
+      </label>
+      <button class="icon-btn" style="padding: 4px 10px; font-size: 0.78rem;" onclick="resetTbCount()">
+        重置卡數 (3張)
+      </button>
+    </div>
+  </section>
+
+  <script>
+    // --- 狀態變數 ---
+    let baseDuration = 30;          // 預設秒數 (30 / 45 / 60)
+    let currentTurnMax = 30;        // 當前行動總秒數上限（計算圓環比例用）
+    let remainingTime = 30.0;       // 剩餘秒數
+    let isRunning = false;          // 是否倒數中
+    let timerInterval = null;       // 計時器 requestAnimationFrame ID
+    let lastTimestamp = null;       // 高精度時間戳
+
+    // 狀態文字暫時覆蓋（用於顯示「已加時」提示唔會被 tick 即刻蓋過）
+    let statusOverrideText = null;
+    let statusOverrideUntil = 0;
+
+    // Time Bank 變數
+    let tbCards = 3;                // 剩餘 Time Bank 卡數
+    let tbIncrement = 30;           // 每張 Time Bank 增加秒數
+
+    // 音效與防鎖機變數
+    let soundEnabled = true;
+    let audioCtx = null;
+    let lastBeepSecond = null;
+    let wakeLockSentinel = null;
+
+    // 圓環常數 (r = 135 => 2 * PI * 135 ≈ 848.23)
+    const CIRCLE_CIRCUMFERENCE = 2 * Math.PI * 135;
+    const progressCircle = document.getElementById('progressCircle');
+    progressCircle.style.strokeDasharray = `${CIRCLE_CIRCUMFERENCE}`;
+
+    // --- 螢幕防鎖機 (Screen Wake Lock API) ---
+    async function requestWakeLock() {
+      if ('wakeLock' in navigator) {
+        try {
+          if (!wakeLockSentinel) {
+            wakeLockSentinel = await navigator.wakeLock.request('screen');
+            wakeLockSentinel.addEventListener('release', () => {
+              wakeLockSentinel = null;
+            });
+          }
+        } catch (err) {
+          // 瀏覽器不支援或電量過低時靜默忽略
+        }
+      }
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && isRunning) {
+        requestWakeLock();
+      }
+    });
+
+    // --- 初始化 Web Audio API ---
+    function initAudio() {
+      if (!audioCtx) {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (AudioContext) {
+          audioCtx = new AudioContext();
+        }
+      }
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    function playTone(freq = 880, duration = 0.12, type = 'sine') {
+      if (!soundEnabled) return;
+      initAudio();
+      if (!audioCtx) return;
+
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+
+      gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      osc.start();
+      osc.stop(audioCtx.currentTime + duration);
+    }
+
+    // --- 切換音效開關 ---
+    function toggleSound() {
+      soundEnabled = !soundEnabled;
+      const btn = document.getElementById('soundToggleBtn');
+      btn.textContent = soundEnabled ? '🔊 音效: 開' : '🔇 音效: 關';
+      if (soundEnabled) {
+        playTone(660, 0.08, 'sine');
+      }
+    }
+
+    // --- 設定暫時狀態提示 ---
+    function setStatusOverride(text, durationMs = 2200) {
+      statusOverrideText = text;
+      statusOverrideUntil = performance.now() + durationMs;
+    }
+
+    // --- 切換預設秒數 (30s / 45s / 60s) ---
+    function setPreset(seconds) {
+      initAudio();
+      baseDuration = seconds;
+
+      // 更新按鈕 UI
+      [30, 45, 60].forEach(sec => {
+        const btn = document.getElementById(`preset-${sec}`);
+        btn.classList.toggle('active', sec === seconds);
+      });
+
+      // 立即重置為新秒數並開始倒數（符合實戰節奏）
+      resetAndStart();
+    }
+
+    // --- 主圓圈點擊邏輯（參考 ThinkGTO：一按即重置並進入下一位） ---
+    function handleMainClockTap() {
+      initAudio();
+      resetAndStart();
+    }
+
+    // --- 重置並立即開始 ---
+    function resetAndStart() {
+      initAudio();
+      pauseTimer();
+      remainingTime = baseDuration;
+      currentTurnMax = baseDuration;
+      lastBeepSecond = null;
+      statusOverrideText = null;
+      document.body.classList.remove('urgent-flash');
+      startTimer();
+      playTone(660, 0.08, 'triangle'); // 輕快提示音代表新一輪開始
+    }
+
+    // --- 開始 / 暫停切換 ---
+    function togglePlayPause() {
+      initAudio();
+      if (isRunning) {
+        pauseTimer();
+      } else {
+        if (remainingTime <= 0) {
+          remainingTime = baseDuration;
+          currentTurnMax = baseDuration;
+        }
+        startTimer();
+      }
+    }
+
+    function startTimer() {
+      if (isRunning) return;
+      isRunning = true;
+      lastTimestamp = performance.now();
+      requestWakeLock();
+      updateControlsUI();
+      updateClockUI();
+
+      timerInterval = requestAnimationFrame(tick);
+    }
+
+    function pauseTimer() {
+      isRunning = false;
+      if (timerInterval) {
+        cancelAnimationFrame(timerInterval);
+        timerInterval = null;
+      }
+      document.body.classList.remove('urgent-flash');
+      updateControlsUI();
+      updateClockUI();
+    }
+
+    // --- 高精度倒數迴圈 ---
+    function tick(now) {
+      if (!isRunning) return;
+      const delta = (now - lastTimestamp) / 1000;
+      lastTimestamp = now;
+
+      remainingTime -= delta;
+
+      // 檢查最後 5 秒倒數提示音
+      const ceilSec = Math.ceil(remainingTime);
+      if (ceilSec <= 5 && ceilSec >= 1 && ceilSec !== lastBeepSecond) {
+        lastBeepSecond = ceilSec;
+        playTone(980, 0.12, 'sine');
+      }
+
+      // 當時間歸零時
+      if (remainingTime <= 0) {
+        const autoTb = document.getElementById('autoTbCheckbox').checked;
+        if (autoTb && tbCards > 0) {
+          // 自動觸發 Time Bank
+          useTimeBank(true);
+          lastTimestamp = performance.now();
+          timerInterval = requestAnimationFrame(tick);
+          return;
+        } else {
+          // 真正 Time Out
+          remainingTime = 0;
+          isRunning = false;
+          statusOverrideText = null;
+          document.body.classList.remove('urgent-flash');
+          playTone(220, 0.6, 'sawtooth'); // 長低音代表超時
+          updateControlsUI();
+          updateClockUI();
+          return;
+        }
+      }
+
+      updateClockUI();
+      timerInterval = requestAnimationFrame(tick);
+    }
+
+    // --- 使用 Time Bank ---
+    function useTimeBank(isAuto = false) {
+      initAudio();
+      if (tbCards <= 0) return;
+
+      tbCards--;
+      // 確保歸零自動觸發時唔會因為微小負數而扣減秒數
+      remainingTime = Math.max(0, remainingTime) + tbIncrement;
+      currentTurnMax = Math.max(currentTurnMax, remainingTime);
+      lastBeepSecond = null;
+
+      // 播放加時音效（雙音上升）
+      playTone(587.33, 0.1, 'sine');
+      setTimeout(() => playTone(880, 0.18, 'sine'), 100);
+
+      // 設定狀態提示文字並維持 2.5 秒
+      const msg = isAuto
+        ? `⚡ 自動扣卡 (+${tbIncrement}s)`
+        : `🏦 已加時 (+${tbIncrement}s)`;
+      setStatusOverride(msg, 2500);
+
+      // 若原本已超時或暫停，使用 Time Bank 後自動繼續倒數
+      if (!isRunning) {
+        startTimer();
+      }
+
+      renderTimeBankUI();
+      updateClockUI();
+    }
+
+    // --- 調整 Time Bank 卡數 ---
+    function adjustTbCount(delta) {
+      tbCards = Math.max(0, Math.min(12, tbCards + delta));
+      renderTimeBankUI();
+    }
+
+    function resetTbCount() {
+      tbCards = 3;
+      renderTimeBankUI();
+    }
+
+    function updateTbIncrement() {
+      const select = document.getElementById('tbSecondsSelect');
+      tbIncrement = parseInt(select.value, 10);
+      renderTimeBankUI();
+    }
+
+    // --- 渲染 Time Bank UI ---
+    function renderTimeBankUI() {
+      const container = document.getElementById('tbChipsContainer');
+      const countText = document.getElementById('tbCountText');
+      const useBtn = document.getElementById('useTbBtn');
+
+      countText.textContent = `${tbCards} 張`;
+      useBtn.textContent = `⚡ 使用 Time Bank (+${tbIncrement}s)`;
+      useBtn.disabled = tbCards <= 0;
+
+      container.innerHTML = '';
+      if (tbCards === 0) {
+        container.innerHTML = `<span class="tb-empty">⚠️ 已無剩餘 Time Bank 卡</span>`;
+      } else {
+        for (let i = 0; i < tbCards; i++) {
+          const chip = document.createElement('div');
+          chip.className = 'tb-chip';
+          chip.textContent = `+${tbIncrement}`;
+          container.appendChild(chip);
+        }
+      }
+    }
+
+    // --- 更新播放/暫停按鈕狀態 ---
+    function updateControlsUI() {
+      const playPauseBtn = document.getElementById('playPauseBtn');
+      const tapHint = document.getElementById('tapHint');
+
+      if (isRunning) {
+        playPauseBtn.innerHTML = '⏸️ 暫停';
+        tapHint.textContent = '點擊圓圈：重置並輪到下一位';
+      } else {
+        playPauseBtn.innerHTML = remainingTime <= 0 ? '▶️ 重新開始' : '▶️ 繼續 / 開始';
+        tapHint.textContent = '點擊圓圈：立即開始倒數';
+      }
+    }
+
+    // --- 更新主時鐘與圓環進度 ---
+    function updateClockUI() {
+      const timeDisplay = document.getElementById('timeDisplay');
+      const statusLabel = document.getElementById('statusLabel');
+      const now = performance.now();
+
+      // 顯示 1 位小數
+      timeDisplay.textContent = Math.max(0, remainingTime).toFixed(1);
+
+      // 計算圓環進度
+      const fraction = Math.max(0, Math.min(1, remainingTime / currentTurnMax));
+      const offset = CIRCLE_CIRCUMFERENCE * (1 - fraction);
+      progressCircle.style.strokeDashoffset = `${offset}`;
+
+      // 判斷是否處於加時提示覆蓋期
+      const hasOverride = statusOverrideText && now < statusOverrideUntil;
+      if (!hasOverride) {
+        statusOverrideText = null;
+      }
+
+      // 顏色與狀態切換
+      if (remainingTime <= 0) {
+        progressCircle.style.stroke = 'var(--red)';
+        timeDisplay.style.color = 'var(--red)';
+        statusLabel.textContent = '🚨 TIME OUT 超時！';
+        document.body.classList.remove('urgent-flash');
+      } else if (remainingTime <= 5) {
+        progressCircle.style.stroke = 'var(--red)';
+        timeDisplay.style.color = 'var(--red)';
+        statusLabel.textContent = hasOverride ? statusOverrideText : (isRunning ? '🔥 最後倒數！' : '⏸️ 已暫停');
+        if (isRunning) {
+          document.body.classList.add('urgent-flash');
+        } else {
+          document.body.classList.remove('urgent-flash');
+        }
+      } else if (remainingTime <= 10) {
+        progressCircle.style.stroke = 'var(--amber)';
+        timeDisplay.style.color = 'var(--amber)';
+        statusLabel.textContent = hasOverride ? statusOverrideText : (isRunning ? '⚠️ 請盡快行動' : '⏸️ 已暫停');
+        document.body.classList.remove('urgent-flash');
+      } else {
+        progressCircle.style.stroke = 'var(--green)';
+        timeDisplay.style.color = 'var(--text-main)';
+        statusLabel.textContent = hasOverride ? statusOverrideText : (isRunning ? '🟢 思考行動中...' : '準備開始');
+        document.body.classList.remove('urgent-flash');
+      }
+    }
+
+    // --- 頁面載入初始化 ---
+    window.addEventListener('DOMContentLoaded', () => {
+      renderTimeBankUI();
+      updateControlsUI();
+      updateClockUI();
+    });
+  </script>
+</body>
+</html>
+```
